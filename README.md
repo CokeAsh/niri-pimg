@@ -103,3 +103,7 @@ For a custom installation prefix, pass the same prefix used during installation:
 
 The uninstaller removes only the installed executable. Remove any niri rules
 you copied into your configuration separately.
+
+## License
+
+MIT
