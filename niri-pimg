@@ -439,7 +439,7 @@ class PinWindow(Gtk.ApplicationWindow):
 class PinApplication(Gtk.Application):
     def __init__(self) -> None:
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
-        self.capture = "--capture" in sys.argv
+        self.capture = "--clipboard" not in sys.argv
         self.previous_image = None
         self.capture_started = 0.0
 

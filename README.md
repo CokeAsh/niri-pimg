@@ -16,7 +16,7 @@ Download the `niri-pimg` file, make it executable, and run it:
 
 ```sh
 chmod +x niri-pimg
-./niri-pimg --capture
+./niri-pimg
 ```
 
 You can optionally place it somewhere on `PATH`:
@@ -49,8 +49,9 @@ modify your niri configuration.
 
 ## Usage
 
-- `niri-pimg --capture`: open niri's region selector and automatically pin the result.
-- `niri-pimg`: pin the PNG image currently in the Wayland clipboard.
+- `niri-pimg`: open niri's region selector and automatically pin the result.
+- `niri-pimg --clipboard`: pin the PNG image currently in the Wayland clipboard.
+- `niri-pimg --capture`: compatibility alias for the default capture behavior.
 - `E` or right click: toggle editing.
 - Drag in view mode: move the pin.
 - Mouse wheel in view mode: resize.
@@ -71,7 +72,7 @@ Copy the rules from `niri/integration.kdl` into your niri configuration. The
 shortcut uses:
 
 ```kdl
-Mod+Shift+S { spawn "/home/ashton/.local/bin/niri-pimg" "--capture"; }
+Mod+Shift+S { spawn "niri-pimg"; }
 ```
 
 Change the path if you used a custom prefix, then reload niri's configuration:

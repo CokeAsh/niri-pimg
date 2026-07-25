@@ -6,6 +6,6 @@ window-rule {
 
 binds {
     Mod+Shift+S hotkey-overlay-title="Screenshot and Pin" {
-        spawn "/home/ashton/.local/bin/niri-pimg" "--capture";
+        spawn "niri-pimg";
     }
 }
