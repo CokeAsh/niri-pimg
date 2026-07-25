@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="niri-pimg — a lightweight screenshot, pin, and annotation tool for niri.">
+  <meta name="theme-color" content="#090b10">
+  <title>niri-pimg — Screenshot. Pin. Done.</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <header class="nav shell">
+    <a class="brand" href="#top" aria-label="niri-pimg">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <rect x="5" y="5" width="30" height="30" rx="9"></rect>
+        <path d="M13 26V14l14 12V14"></path>
+        <circle cx="29" cy="11" r="3"></circle>
+      </svg>
+      <span>niri-pimg</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a href="#features" data-i18n="nav.features">功能</a>
+      <a href="#install" data-i18n="nav.install">安装</a>
+      <a href="#controls" data-i18n="nav.controls">操作</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="lang-toggle" type="button" aria-label="Switch language">
+        <span data-lang-option="zh">中</span>
+        <span class="toggle-divider">/</span>
+        <span data-lang-option="en">EN</span>
+      </button>
+      <a class="icon-link" href="https://github.com/CokeAsh/niri-pimg" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.87c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.54 1.03 1.54 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.58 9.58 0 0 1 12 6.82a9.6 9.6 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.56 4.94.36.31.68.92.68 1.86v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"></path></svg>
+      </a>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="status-dot"></span><span data-i18n="hero.eyebrow">为 niri 原生打造</span></div>
+        <h1><span data-i18n="hero.line1">截图。</span><br><span class="gradient-text" data-i18n="hero.line2">钉住。完成。</span></h1>
+        <p class="hero-lead" data-i18n="hero.lead">一个轻量、快速的截图置顶与标注工具。专为 niri 和 Wayland 设计，不绕路，不打扰。</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#install">
+            <span data-i18n="hero.install">立即安装</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6"></path></svg>
+          </a>
+          <a class="button secondary" href="https://aur.archlinux.org/packages/niri-pimg">
+            <span data-i18n="hero.aur">在 AUR 查看</span>
+          </a>
+        </div>
+        <div class="hero-meta">
+          <span>MIT</span><i></i><span>Python + GTK4</span><i></i><span>Wayland native</span>
+        </div>
+      </div>
+
+      <div class="demo-wrap" aria-label="Application preview">
+        <div class="demo-glow"></div>
+        <div class="desktop-card">
+          <div class="desktop-topbar">
+            <span>niri</span>
+            <div class="workspace-pills"><i></i><i class="active"></i><i></i></div>
+            <span>22:42</span>
+          </div>
+          <div class="desktop">
+            <div class="ghost-window ghost-one"></div>
+            <div class="ghost-window ghost-two"></div>
+            <div class="pin-window">
+              <div class="pin-art">
+                <div class="art-sun"></div>
+                <div class="art-ridge ridge-back"></div>
+                <div class="art-ridge ridge-front"></div>
+                <svg class="annotation" viewBox="0 0 320 210" aria-hidden="true">
+                  <path d="M75 150c22-35 57-58 99-62"></path>
+                  <path d="m157 76 20 11-14 18"></path>
+                  <rect x="192" y="40" width="87" height="48" rx="5"></rect>
+                </svg>
+              </div>
+              <div class="tool-palette">
+                <button aria-label="Pen">⌁</button><button aria-label="Arrow">➜</button>
+                <button class="selected" aria-label="Rectangle">□</button><button aria-label="Text">T</button>
+                <span class="color red"></span><span class="color yellow"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="shortcut-chip"><kbd>Mod</kbd><b>+</b><kbd>Shift</kbd><b>+</b><kbd>S</kbd></div>
+      </div>
+    </section>
+
+    <section class="section shell" id="features">
+      <div class="section-heading">
+        <div>
+          <p class="kicker" data-i18n="features.kicker">小而强大</p>
+          <h2 data-i18n="features.title">只做你真正需要的事</h2>
+        </div>
+        <p data-i18n="features.lead">从选区到置顶，只需一次动作。需要时再编辑，不需要时安静悬浮。</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card featured">
+          <span class="feature-number">01</span>
+          <div class="feature-icon crop-icon"><i></i></div>
+          <h3 data-i18n="features.capture.title">niri 原生截图</h3>
+          <p data-i18n="features.capture.body">直接调用 niri 的选区截图能力，在多显示器环境中保持可靠。</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">02</span>
+          <div class="feature-icon pin-icon">⌖</div>
+          <h3 data-i18n="features.pin.title">立即置顶</h3>
+          <p data-i18n="features.pin.body">选区完成后自动创建浮动窗口。拖动移动，滚轮调整大小。</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">03</span>
+          <div class="feature-icon draw-icon">↗</div>
+          <h3 data-i18n="features.annotate.title">非破坏标注</h3>
+          <p data-i18n="features.annotate.body">画笔、直线、箭头、矩形、文字、马赛克和橡皮擦一应俱全。</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">04</span>
+          <div class="feature-icon multi-icon"><i></i><i></i></div>
+          <h3 data-i18n="features.multi.title">多个 Pin 共存</h3>
+          <p data-i18n="features.multi.body">每个截图都是独立窗口，随时保留多个参考画面。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section workflow-section">
+      <div class="shell">
+        <p class="kicker" data-i18n="workflow.kicker">顺畅工作流</p>
+        <h2 data-i18n="workflow.title">三步，不打断思路</h2>
+        <div class="workflow">
+          <article><span>1</span><div><h3 data-i18n="workflow.one.title">选取</h3><p data-i18n="workflow.one.body">按下快捷键，在任意输出上框选内容。</p></div></article>
+          <div class="flow-line"></div>
+          <article><span>2</span><div><h3 data-i18n="workflow.two.title">置顶</h3><p data-i18n="workflow.two.body">图片自动浮在桌面上，拖到你需要的位置。</p></div></article>
+          <div class="flow-line"></div>
+          <article><span>3</span><div><h3 data-i18n="workflow.three.title">标注</h3><p data-i18n="workflow.three.body">按 E 编辑，完成后复制或保存。</p></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell install-section" id="install">
+      <div class="install-copy">
+        <p class="kicker" data-i18n="install.kicker">开始使用</p>
+        <h2 data-i18n="install.title">一分钟安装</h2>
+        <p data-i18n="install.body">Arch Linux 用户可以直接从 AUR 安装。程序不会自动修改你的 niri 配置。</p>
+        <a href="https://github.com/CokeAsh/niri-pimg#install" class="text-link">
+          <span data-i18n="install.other">查看其他安装方式</span><span>↗</span>
+        </a>
+      </div>
+      <div class="terminal">
+        <div class="terminal-bar"><div><i></i><i></i><i></i></div><span>terminal</span><button class="copy-button" type="button" data-copy="paru -S niri-pimg"><span data-i18n="install.copy">复制</span></button></div>
+        <pre><span class="prompt">❯</span> <code>paru -S niri-pimg</code></pre>
+        <div class="terminal-rule"></div>
+        <p data-i18n="install.configLabel">添加到 niri 配置：</p>
+        <pre class="config-code"><code>Mod+Shift+S {
+    spawn "niri-pimg";
+}</code></pre>
+      </div>
+    </section>
+
+    <section class="section shell" id="controls">
+      <div class="section-heading controls-heading">
+        <div><p class="kicker" data-i18n="controls.kicker">快速上手</p><h2 data-i18n="controls.title">操作自然，快捷直接</h2></div>
+      </div>
+      <div class="control-grid">
+        <div><kbd>Drag</kbd><span data-i18n="controls.drag">移动 Pin</span></div>
+        <div><kbd>Wheel</kbd><span data-i18n="controls.wheel">调整大小</span></div>
+        <div><kbd>E</kbd><span data-i18n="controls.edit">切换编辑</span></div>
+        <div><kbd>Ctrl C</kbd><span data-i18n="controls.copy">复制图片</span></div>
+        <div><kbd>Ctrl S</kbd><span data-i18n="controls.save">保存 PNG</span></div>
+        <div><kbd>Esc</kbd><span data-i18n="controls.close">退出或关闭</span></div>
+      </div>
+    </section>
+
+    <section class="cta shell">
+      <div>
+        <p class="kicker" data-i18n="cta.kicker">保持专注</p>
+        <h2 data-i18n="cta.title">让截图留在眼前，<br>而不是打断工作。</h2>
+        <p class="cta-note" data-i18n="cta.note">如果 niri-pimg 对你有帮助，欢迎在 GitHub 点一个 Star，让更多 niri 用户发现它。</p>
+      </div>
+      <div class="cta-actions">
+        <a class="button github-star" href="https://github.com/CokeAsh/niri-pimg" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.75 5.57 6.15.9-4.45 4.33 1.05 6.12L12 16.83l-5.5 2.89 1.05-6.12L3.1 9.27l6.15-.9L12 2.8Z"></path></svg>
+          <span data-i18n="cta.star">在 GitHub 点 Star</span>
+        </a>
+        <a class="button primary" href="https://aur.archlinux.org/packages/niri-pimg"><span data-i18n="cta.button">从 AUR 安装</span><span>↗</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer shell">
+    <a class="brand" href="#top"><svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="9"></rect><path d="M13 26V14l14 12V14"></path><circle cx="29" cy="11" r="3"></circle></svg><span>niri-pimg</span></a>
+    <p data-i18n="footer.text">为 niri 社区用心打造 · MIT License</p>
+    <div><a href="https://github.com/CokeAsh/niri-pimg">GitHub</a><a href="https://aur.archlinux.org/packages/niri-pimg">AUR</a></div>
+  </footer>
+
+  <script src="./script.js"></script>
+</body>
+</html>
