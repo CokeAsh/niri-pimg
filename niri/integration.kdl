@@ -1,0 +1,11 @@
+// Merge these rules and bind into your niri configuration.
+window-rule {
+    match app-id=r#"^io\.github\.ashton\.NiriPimg$"#
+    open-floating true
+}
+
+binds {
+    Mod+Shift+S hotkey-overlay-title="Screenshot and Pin" {
+        spawn "/home/ashton/.local/bin/niri-pimg" "--capture";
+    }
+}

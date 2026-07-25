@@ -1,0 +1,480 @@
+#!/usr/bin/env python3
+"""Screenshot, pin, and annotate images on niri/Wayland."""
+
+from __future__ import annotations
+
+import io
+import math
+import subprocess
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import cairo
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+from gi.repository import Gdk, Gio, GLib, Gtk
+
+APP_ID = "io.github.ashton.NiriPimg"
+SAVE_DIR = Path.home() / "Pictures" / "Screenshots"
+
+
+def clipboard_image() -> bytes | None:
+    result = subprocess.run(
+        ["wl-paste", "--no-newline", "--type", "image/png"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.stdout if result.returncode == 0 and result.stdout else None
+
+
+class Canvas(Gtk.DrawingArea):
+    COLORS = {
+        "Red": (1.0, 0.16, 0.12, 1.0),
+        "Yellow": (1.0, 0.78, 0.05, 1.0),
+        "Green": (0.1, 0.85, 0.35, 1.0),
+        "Blue": (0.1, 0.55, 1.0, 1.0),
+        "White": (1.0, 1.0, 1.0, 1.0),
+        "Black": (0.03, 0.03, 0.03, 1.0),
+    }
+
+    def __init__(self, window: "PinWindow", image: bytes) -> None:
+        super().__init__()
+        self.window = window
+        self.base = cairo.ImageSurface.create_from_png(io.BytesIO(image))
+        self.image_width = self.base.get_width()
+        self.image_height = self.base.get_height()
+        # Do not use the image dimensions as the drawing area's intrinsic
+        # minimum size; the pin window must remain manually shrinkable.
+        self.set_draw_func(self._draw)
+        self.set_hexpand(True)
+        self.set_vexpand(True)
+
+        self.tool = "pen"
+        self.color = self.COLORS["Red"]
+        self.line_width = 5.0
+        self.operations: list[dict] = []
+        self.redo_stack: list[dict] = []
+        self.active: dict | None = None
+        self.drag_origin = (0.0, 0.0)
+
+        drag = Gtk.GestureDrag(button=1)
+        drag.connect("drag-begin", self._drag_begin)
+        drag.connect("drag-update", self._drag_update)
+        drag.connect("drag-end", self._drag_end)
+        self.add_controller(drag)
+
+        click = Gtk.GestureClick(button=1)
+        click.connect("pressed", self._click)
+        self.add_controller(click)
+
+    def viewport(self) -> tuple[float, float, float]:
+        width = max(1, self.get_width())
+        height = max(1, self.get_height())
+        scale = min(width / self.image_width, height / self.image_height)
+        offset_x = (width - self.image_width * scale) / 2
+        offset_y = (height - self.image_height * scale) / 2
+        return scale, offset_x, offset_y
+
+    def point(self, x: float, y: float) -> tuple[float, float]:
+        scale, offset_x, offset_y = self.viewport()
+        image_x = (x - offset_x) / scale
+        image_y = (y - offset_y) / scale
+        return (
+            min(self.image_width, max(0.0, image_x)),
+            min(self.image_height, max(0.0, image_y)),
+        )
+
+    def _click(self, gesture, presses, x, y) -> None:
+        if not self.window.editing:
+            self.window.start_move(gesture, x, y)
+        elif self.tool == "text":
+            self.window.request_text(*self.point(x, y))
+
+    def _drag_begin(self, gesture, x, y) -> None:
+        if not self.window.editing or self.tool == "text":
+            return
+        point = self.point(x, y)
+        self.drag_origin = point
+        self.active = {
+            "tool": self.tool,
+            "color": self.color,
+            "width": self.line_width,
+            "start": point,
+            "end": point,
+            "points": [point],
+        }
+
+    def _drag_update(self, gesture, dx, dy) -> None:
+        if self.active is None:
+            return
+        scale, _offset_x, _offset_y = self.viewport()
+        x = self.drag_origin[0] + dx / scale
+        y = self.drag_origin[1] + dy / scale
+        self.active["end"] = (x, y)
+        if self.active["tool"] in ("pen", "eraser"):
+            self.active["points"].append((x, y))
+        self.queue_draw()
+
+    def _drag_end(self, gesture, dx, dy) -> None:
+        if self.active is None:
+            return
+        self.operations.append(self.active)
+        self.active = None
+        self.redo_stack.clear()
+        self.queue_draw()
+
+    def add_text(self, x: float, y: float, text: str) -> None:
+        if not text:
+            return
+        self.operations.append(
+            {
+                "tool": "text",
+                "color": self.color,
+                "width": self.line_width,
+                "start": (x, y),
+                "text": text,
+                "size": max(18.0, self.line_width * 5),
+            }
+        )
+        self.redo_stack.clear()
+        self.queue_draw()
+
+    def undo(self) -> None:
+        if self.operations:
+            self.redo_stack.append(self.operations.pop())
+            self.queue_draw()
+
+    def redo(self) -> None:
+        if self.redo_stack:
+            self.operations.append(self.redo_stack.pop())
+            self.queue_draw()
+
+    def _draw(self, area, context: cairo.Context, width: int, height: int) -> None:
+        scale, offset_x, offset_y = self.viewport()
+        context.save()
+        context.rectangle(
+            offset_x, offset_y, self.image_width * scale, self.image_height * scale
+        )
+        context.clip()
+        context.translate(offset_x, offset_y)
+        context.scale(scale, scale)
+        self.render(context, include_active=True)
+        context.restore()
+
+    def render(self, context: cairo.Context, include_active: bool = False) -> None:
+        context.set_source_surface(self.base, 0, 0)
+        context.paint()
+        operations = self.operations + ([self.active] if include_active and self.active else [])
+        for operation in operations:
+            self._draw_operation(context, operation)
+
+    def _draw_operation(self, cr: cairo.Context, op: dict) -> None:
+        tool = op["tool"]
+        cr.save()
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_line_join(cairo.LINE_JOIN_ROUND)
+        cr.set_line_width(op["width"])
+        cr.set_source_rgba(*op["color"])
+
+        if tool in ("pen", "eraser"):
+            points = op["points"]
+            if tool == "eraser":
+                cr.set_operator(cairo.OPERATOR_CLEAR)
+                cr.set_line_width(op["width"] * 3)
+            if points:
+                cr.move_to(*points[0])
+                for point in points[1:]:
+                    cr.line_to(*point)
+                cr.stroke()
+        elif tool in ("line", "arrow"):
+            cr.move_to(*op["start"])
+            cr.line_to(*op["end"])
+            cr.stroke()
+            if tool == "arrow":
+                self._arrow_head(cr, op["start"], op["end"], op["width"])
+        elif tool == "rectangle":
+            x1, y1 = op["start"]
+            x2, y2 = op["end"]
+            cr.rectangle(min(x1, x2), min(y1, y2), abs(x2 - x1), abs(y2 - y1))
+            cr.stroke()
+        elif tool == "mosaic":
+            self._mosaic(cr, op["start"], op["end"])
+        elif tool == "text":
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            cr.set_font_size(op["size"])
+            x, y = op["start"]
+            for line in op["text"].splitlines():
+                cr.move_to(x, y)
+                cr.show_text(line)
+                y += op["size"] * 1.25
+        cr.restore()
+
+    @staticmethod
+    def _arrow_head(cr, start, end, width) -> None:
+        x1, y1 = start
+        x2, y2 = end
+        angle = math.atan2(y2 - y1, x2 - x1)
+        size = max(14, width * 4)
+        cr.move_to(x2, y2)
+        cr.line_to(x2 - size * math.cos(angle - 0.48), y2 - size * math.sin(angle - 0.48))
+        cr.move_to(x2, y2)
+        cr.line_to(x2 - size * math.cos(angle + 0.48), y2 - size * math.sin(angle + 0.48))
+        cr.stroke()
+
+    def _mosaic(self, cr, start, end) -> None:
+        x1, y1 = start
+        x2, y2 = end
+        x, y = int(min(x1, x2)), int(min(y1, y2))
+        width, height = int(abs(x2 - x1)), int(abs(y2 - y1))
+        if width < 2 or height < 2:
+            return
+        small_width, small_height = max(1, width // 14), max(1, height // 14)
+        small = cairo.ImageSurface(cairo.FORMAT_ARGB32, small_width, small_height)
+        sample = cairo.Context(small)
+        sample.scale(small_width / width, small_height / height)
+        sample.set_source_surface(self.base, -x, -y)
+        sample.get_source().set_filter(cairo.FILTER_BILINEAR)
+        sample.paint()
+        cr.save()
+        cr.rectangle(x, y, width, height)
+        cr.clip()
+        cr.translate(x, y)
+        cr.scale(width / small_width, height / small_height)
+        cr.set_source_surface(small, 0, 0)
+        cr.get_source().set_filter(cairo.FILTER_NEAREST)
+        cr.paint()
+        cr.restore()
+
+    def png_bytes(self) -> bytes:
+        output = cairo.ImageSurface(
+            cairo.FORMAT_ARGB32, self.image_width, self.image_height
+        )
+        context = cairo.Context(output)
+        self.render(context)
+        buffer = io.BytesIO()
+        output.write_to_png(buffer)
+        return buffer.getvalue()
+
+
+class PinWindow(Gtk.ApplicationWindow):
+    TOOL_LABELS = [
+        ("pen", "✎"),
+        ("line", "╱"),
+        ("arrow", "➜"),
+        ("rectangle", "□"),
+        ("text", "T"),
+        ("mosaic", "▦"),
+        ("eraser", "⌫"),
+    ]
+
+    def __init__(self, app: Gtk.Application, image: bytes) -> None:
+        super().__init__(application=app, title="Niri Pinned Image")
+        self.set_decorated(False)
+        self.set_resizable(True)
+        self.editing = False
+
+        self.canvas = Canvas(self, image)
+        self.toolbar = self._build_toolbar()
+        self.toolbar.set_visible(False)
+        layout = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        layout.append(self.toolbar)
+        layout.append(self.canvas)
+        self.set_child(layout)
+
+        click = Gtk.GestureClick(button=3)
+        click.connect("pressed", lambda *_: self.toggle_edit())
+        self.add_controller(click)
+
+        scroll = Gtk.EventControllerScroll(flags=Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll.connect("scroll", self._zoom)
+        self.add_controller(scroll)
+
+        keys = Gtk.EventControllerKey()
+        keys.connect("key-pressed", self._key_pressed)
+        self.add_controller(keys)
+
+        scale = min(1.0, 1200 / self.canvas.image_width, 800 / self.canvas.image_height)
+        self.set_default_size(
+            max(96, round(self.canvas.image_width * scale)),
+            max(64, round(self.canvas.image_height * scale)),
+        )
+        self.present()
+
+    def _build_toolbar(self) -> Gtk.Widget:
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        bar.set_margin_top(5)
+        bar.set_margin_bottom(5)
+        bar.set_margin_start(7)
+        bar.set_margin_end(7)
+        first = None
+        for tool, label in self.TOOL_LABELS:
+            button = Gtk.ToggleButton(label=label)
+            button.set_tooltip_text(tool.title())
+            if first is None:
+                first = button
+                button.set_active(True)
+            else:
+                button.set_group(first)
+            button.connect("toggled", self._select_tool, tool)
+            bar.append(button)
+
+        color = Gtk.DropDown.new_from_strings(list(Canvas.COLORS))
+        color.set_selected(0)
+        color.connect("notify::selected", self._select_color)
+        bar.append(color)
+
+        width = Gtk.SpinButton.new_with_range(1, 30, 1)
+        width.set_value(5)
+        width.connect("value-changed", lambda widget: setattr(self.canvas, "line_width", widget.get_value()))
+        bar.append(width)
+
+        for label, tip, callback in [
+            ("↶", "Undo (Ctrl+Z)", lambda *_: self.canvas.undo()),
+            ("↷", "Redo (Ctrl+Shift+Z)", lambda *_: self.canvas.redo()),
+            ("⧉", "Copy (Ctrl+C)", lambda *_: self.copy_image()),
+            ("↓", "Save (Ctrl+S)", lambda *_: self.save_image()),
+            ("×", "Finish editing (E)", lambda *_: self.toggle_edit()),
+        ]:
+            button = Gtk.Button(label=label)
+            button.set_tooltip_text(tip)
+            button.connect("clicked", callback)
+            bar.append(button)
+        return bar
+
+    def _select_tool(self, button, tool) -> None:
+        if button.get_active():
+            self.canvas.tool = tool
+
+    def _select_color(self, dropdown, _param) -> None:
+        name = list(Canvas.COLORS)[dropdown.get_selected()]
+        self.canvas.color = Canvas.COLORS[name]
+
+    def toggle_edit(self) -> None:
+        self.editing = not self.editing
+        self.toolbar.set_visible(self.editing)
+        self.set_title("Niri Pinned Image — Editing" if self.editing else "Niri Pinned Image")
+
+    def start_move(self, gesture, x, y) -> None:
+        event = gesture.get_current_event()
+        surface = self.get_surface()
+        if event is not None and surface is not None:
+            surface.begin_move(
+                event.get_device(), gesture.get_current_button(), x, y, event.get_time()
+            )
+
+    def request_text(self, x: float, y: float) -> None:
+        dialog = Gtk.Dialog(title="Add text", transient_for=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Add", Gtk.ResponseType.OK)
+        entry = Gtk.Entry(placeholder_text="Text")
+        entry.set_margin_top(12)
+        entry.set_margin_bottom(12)
+        entry.set_margin_start(12)
+        entry.set_margin_end(12)
+        dialog.get_content_area().append(entry)
+
+        def response(widget, response_id):
+            if response_id == Gtk.ResponseType.OK:
+                self.canvas.add_text(x, y, entry.get_text())
+            widget.destroy()
+
+        dialog.connect("response", response)
+        dialog.present()
+        entry.grab_focus()
+
+    def copy_image(self) -> None:
+        subprocess.run(
+            ["wl-copy", "--type", "image/png"],
+            input=self.canvas.png_bytes(),
+            stderr=subprocess.DEVNULL,
+        )
+
+    def save_image(self) -> None:
+        SAVE_DIR.mkdir(parents=True, exist_ok=True)
+        filename = SAVE_DIR / datetime.now().strftime("Pinned-edit-%Y-%m-%d_%H-%M-%S.png")
+        filename.write_bytes(self.canvas.png_bytes())
+        self.set_title(f"Saved: {filename.name}")
+
+    def _zoom(self, controller, dx, dy) -> bool:
+        if self.editing:
+            return False
+        factor = 1.1 if dy < 0 else 1 / 1.1
+        self.set_default_size(
+            max(96, round(self.get_width() * factor)),
+            max(64, round(self.get_height() * factor)),
+        )
+        return True
+
+    def _key_pressed(self, controller, keyval, keycode, state) -> bool:
+        ctrl = bool(state & Gdk.ModifierType.CONTROL_MASK)
+        shift = bool(state & Gdk.ModifierType.SHIFT_MASK)
+        if keyval in (Gdk.KEY_e, Gdk.KEY_E):
+            self.toggle_edit()
+            return True
+        if ctrl and keyval == Gdk.KEY_z:
+            self.canvas.redo() if shift else self.canvas.undo()
+            return True
+        if ctrl and keyval == Gdk.KEY_c:
+            self.copy_image()
+            return True
+        if ctrl and keyval == Gdk.KEY_s:
+            self.save_image()
+            return True
+        if keyval == Gdk.KEY_Escape:
+            if self.editing:
+                self.toggle_edit()
+            else:
+                self.close()
+            return True
+        if keyval == Gdk.KEY_q and not self.editing:
+            self.close()
+            return True
+        return False
+
+
+class PinApplication(Gtk.Application):
+    def __init__(self) -> None:
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
+        self.capture = "--capture" in sys.argv
+        self.previous_image = None
+        self.capture_started = 0.0
+
+    def do_activate(self) -> None:
+        if not self.capture:
+            image = clipboard_image()
+            if image is None:
+                print("niri-pimg: clipboard does not contain an image")
+                self.quit()
+                return
+            PinWindow(self, image)
+            return
+        self.previous_image = clipboard_image()
+        self.capture_started = time.monotonic()
+        self.hold()
+        subprocess.run(
+            ["niri", "msg", "action", "screenshot"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        GLib.timeout_add(150, self._wait_for_capture)
+
+    def _wait_for_capture(self) -> bool:
+        image = clipboard_image()
+        if image is not None and image != self.previous_image:
+            PinWindow(self, image)
+            self.release()
+            return GLib.SOURCE_REMOVE
+        if time.monotonic() - self.capture_started > 120:
+            print("niri-pimg: screenshot cancelled or timed out")
+            self.release()
+            self.quit()
+            return GLib.SOURCE_REMOVE
+        return GLib.SOURCE_CONTINUE
+
+
+if __name__ == "__main__":
+    raise SystemExit(PinApplication().run())
